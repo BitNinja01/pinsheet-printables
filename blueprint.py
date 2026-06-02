@@ -10,6 +10,7 @@ from flask import (
     send_from_directory, g,
 )
 from flask_login import current_user, login_required
+from source.request_data import base_context
 
 bp = Blueprint("printables", __name__, template_folder="templates")
 
@@ -17,10 +18,6 @@ bp = Blueprint("printables", __name__, template_folder="templates")
 @bp.route("/")
 @login_required
 def printables_page():
-    view_user = getattr(g, "view_user", None)
-    if view_user is None:
-        return "No user", 400
-
     output_dir = Path(current_app.config["DATA_DIR"]) / "plugins" / "printables"
     pdfs = []
     for name in [
@@ -43,6 +40,7 @@ def printables_page():
         pdfs=pdfs,
         is_admin=current_user.is_admin,
         current_page="printables",
+        **base_context(),
     )
 
 
