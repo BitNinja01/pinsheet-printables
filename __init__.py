@@ -16,7 +16,7 @@ log = logging.getLogger("pinsheet")
 
 plugin_info = {
     "name": "printables",
-    "version": "0.3.0",
+    "version": "0.3.1",
     "description": "Printable golf forms (scorecards, bingo cards)",
     "author": "PinSheet",
 }
