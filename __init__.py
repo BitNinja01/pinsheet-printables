@@ -53,7 +53,10 @@ def register(app):
     # Exempt POST routes from CSRF (same as cartographer)
     csrf_exempt = app.extensions.get("csrf")
     if csrf_exempt is not None:
-        csrf_exempt.exempt(bp.regenerate)
+        for name in ("printables.regenerate",):
+            fn = app.view_functions.get(name)
+            if fn is not None:
+                csrf_exempt.exempt(fn)
 
     # 1. Install fonts (best-effort)
     try:
