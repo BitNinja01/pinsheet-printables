@@ -1,1 +1,31 @@
+# Artifacts — internal tooling, session memory, AI config
+.scratch/
+.opencode/
+docs/HANDOFF.md
+docs/SESSION_LOG.md
+docs/SESSION_LOG_ARCHIVE.md
+docs/BACKLOG.md
+docs/DECISIONS.md
+docs/CONTEXT.md
+docs/RUNBOOK.md
+CLAUDE.md
+.claude/
+.aider*
+AGENTS.md
+CODEBASE_IMPROVEMENTS.md
+PICKUP_PROMPT.md
+
+# Python
 __pycache__/
+*.py[cod]
+*$py.class
+
+# Environments
+.env
+.venv
+env/
+venv/
+
+# IDE
+.idea
+.vscode/
