@@ -50,6 +50,11 @@ def generate_pdfs(output_dir: Path) -> None:
 def register(app):
     app.register_blueprint(bp, url_prefix="/printables")
 
+    # Exempt POST routes from CSRF (same as cartographer)
+    csrf_exempt = app.extensions.get("csrf")
+    if csrf_exempt is not None:
+        csrf_exempt.exempt(bp.regenerate)
+
     # 1. Install fonts (best-effort)
     try:
         _install_fonts()
