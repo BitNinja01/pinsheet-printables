@@ -16,7 +16,7 @@ log = logging.getLogger("pinsheet")
 
 plugin_info = {
     "name": "printables",
-    "version": "0.3.0",
+    "version": "0.3.1",
     "description": "Printable golf forms (scorecards, bingo cards)",
     "author": "PinSheet",
 }
@@ -49,6 +49,14 @@ def generate_pdfs(output_dir: Path) -> None:
 
 def register(app):
     app.register_blueprint(bp, url_prefix="/printables")
+
+    # Exempt POST routes from CSRF (same as cartographer)
+    csrf_exempt = app.extensions.get("csrf")
+    if csrf_exempt is not None:
+        for name in ("printables.regenerate",):
+            fn = app.view_functions.get(name)
+            if fn is not None:
+                csrf_exempt.exempt(fn)
 
     # 1. Install fonts (best-effort)
     try:
