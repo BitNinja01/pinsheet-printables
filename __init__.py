@@ -16,7 +16,7 @@ from .blueprint import bp
 log = logging.getLogger("pinsheet")
 
 plugin_info = {
-    "name": "printables",
+    "name": "pinsheet-printables",
     "version": "0.3.1",
     "description": "Printable golf forms (scorecards, bingo cards)",
     "author": "PinSheet",
@@ -73,6 +73,15 @@ def _startup_background(app) -> None:
         log.info("printables: PDFs already exist, skipping generation")
 
 
+def _ensure_cairo() -> bool:
+    try:
+        from cairosvg import svg2pdf
+        svg2pdf(bytestring=b"<svg xmlns='http://www.w3.org/2000/svg' width='10' height='10'><rect width='10' height='10'/></svg>")
+        return True
+    except Exception:
+        return False
+
+
 def register(app):
     app.register_blueprint(bp, url_prefix="/printables")
 
@@ -84,8 +93,10 @@ def register(app):
             if fn is not None:
                 csrf_exempt.exempt(fn)
 
+    pname = plugin_info["name"]
+
     # 1. Inject CSS
-    head_tag = '<link rel="stylesheet" href="/plugins/printables/static/printables.css">'
+    head_tag = f'<link rel="stylesheet" href="/plugins/{pname}/static/printables.css">'
     app._plugin_blocks["head"] = (
         (app._plugin_blocks.get("head", "") + "\n" + head_tag).strip()
     )
@@ -99,13 +110,18 @@ def register(app):
         "page_id": "printables",
     })
 
-    # 3. Defer slow startup work (font install, PDF generation) to background
+    # 3. Check cairo availability
+    if not _ensure_cairo():
+        log.warning("printables: cairosvg/cairo not functional — PDF generation will fail at runtime")
+
+    # 4. Defer slow startup work (font install, PDF generation) to background
     #    so the server can start accepting connections immediately.
     t = threading.Thread(target=_startup_background, args=(app,), daemon=True)
     t.start()
 
 
 def unregister(app):
+    pname = plugin_info["name"]
     output_dir = Path(app.config["DATA_DIR"]) / "plugins" / "printables"
     if output_dir.exists():
         for name in ["bingo.pdf", "bingo_double.pdf", "bingo_letter.pdf", "scorecard_shorthand_double.pdf", "scorecard_shorthand_letter.pdf", "scorecard_shorthand_single.pdf"]:
@@ -114,7 +130,7 @@ def unregister(app):
             output_dir.rmdir()
         except OSError:
             pass
-    head_tag = '<link rel="stylesheet" href="/plugins/printables/static/printables.css">'
+    head_tag = f'<link rel="stylesheet" href="/plugins/{pname}/static/printables.css">'
     current_head = app._plugin_blocks.get("head", "")
     app._plugin_blocks["head"] = current_head.replace(head_tag, "").strip()
     app._plugin_nav[:] = [n for n in app._plugin_nav if n.get("page_id") != "printables"]
