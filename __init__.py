@@ -8,6 +8,7 @@ from __future__ import annotations
 import logging
 import shutil
 import subprocess
+import threading
 from pathlib import Path
 
 from .blueprint import bp
@@ -47,24 +48,12 @@ def generate_pdfs(output_dir: Path) -> None:
     generate_bingo_letter_pdf(output_dir)
 
 
-def register(app):
-    app.register_blueprint(bp, url_prefix="/printables")
-
-    # Exempt POST routes from CSRF (same as cartographer)
-    csrf_exempt = app.extensions.get("csrf")
-    if csrf_exempt is not None:
-        for name in ("printables.regenerate",):
-            fn = app.view_functions.get(name)
-            if fn is not None:
-                csrf_exempt.exempt(fn)
-
-    # 1. Install fonts (best-effort)
+def _startup_background(app) -> None:
     try:
         _install_fonts()
     except Exception:
         log.warning("printables: font installation failed", exc_info=True)
 
-    # 2. Generate PDFs if missing
     output_dir = Path(app.config["DATA_DIR"]) / "plugins" / "printables"
     expected = [
         "bingo.pdf",
@@ -83,13 +72,25 @@ def register(app):
     else:
         log.info("printables: PDFs already exist, skipping generation")
 
-    # 3. Inject CSS
+
+def register(app):
+    app.register_blueprint(bp, url_prefix="/printables")
+
+    # Exempt POST routes from CSRF (same as cartographer)
+    csrf_exempt = app.extensions.get("csrf")
+    if csrf_exempt is not None:
+        for name in ("printables.regenerate",):
+            fn = app.view_functions.get(name)
+            if fn is not None:
+                csrf_exempt.exempt(fn)
+
+    # 1. Inject CSS
     head_tag = '<link rel="stylesheet" href="/plugins/printables/static/printables.css">'
     app._plugin_blocks["head"] = (
         (app._plugin_blocks.get("head", "") + "\n" + head_tag).strip()
     )
 
-    # 4. Add nav link
+    # 2. Add nav link
     if not hasattr(app, "_plugin_nav"):
         app._plugin_nav = []
     app._plugin_nav.append({
@@ -97,6 +98,11 @@ def register(app):
         "url": "/printables",
         "page_id": "printables",
     })
+
+    # 3. Defer slow startup work (font install, PDF generation) to background
+    #    so the server can start accepting connections immediately.
+    t = threading.Thread(target=_startup_background, args=(app,), daemon=True)
+    t.start()
 
 
 def unregister(app):
