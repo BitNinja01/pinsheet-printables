@@ -95,7 +95,7 @@ def register(app):
         app._plugin_nav = []
     app._plugin_nav.append({
         "label": "Printables",
-        "url": "/printables",
+        "url": "/printables/",
         "page_id": "printables",
     })
 
