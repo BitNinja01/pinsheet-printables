@@ -8,7 +8,7 @@ from pathlib import Path
 
 from flask import (
     Blueprint, current_app, jsonify, render_template,
-    send_from_directory, g,
+    send_from_directory,
 )
 from flask_login import current_user, login_required
 from source.request_data import base_context
@@ -21,11 +21,6 @@ bp = Blueprint("printables", __name__, template_folder="templates")
 @bp.route("/")
 @login_required
 def printables_page():
-    view_user = getattr(g, "view_user", None)
-    if view_user is None:
-        log.warning("printables: no view_user for %s", current_user.id)
-        return "No user", 400
-
     output_dir = Path(current_app.config["DATA_DIR"]) / "plugins" / "printables"
     try:
         pdfs = []
