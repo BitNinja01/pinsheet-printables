@@ -3,50 +3,75 @@ name: Release
 on:
   push:
     tags:
-      - "v*.*.*"
+      - 'v*.*.*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to release (e.g. 0.3.2)'
+        required: true
+        type: string
 
 jobs:
   build-and-release:
+    name: Build and Release
     runs-on: ubuntu-latest
+
     permissions:
       contents: write
-      pull-requests: read
 
     steps:
-      - uses: actions/checkout@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
+      - name: Checkout code
+        uses: actions/checkout@v4
 
       - name: Extract version
         id: version
-        run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+        run: |
+          if [ -n "${{ inputs.version }}" ]; then
+            VERSION="${{ inputs.version }}"
+          else
+            VERSION=${GITHUB_REF#refs/tags/v}
+          fi
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Building version: $VERSION"
 
       - name: Build source zip
         run: |
-          git archive --format=zip --output="pinsheet-printables_${{ steps.version.outputs.VERSION }}.zip" HEAD
+          VERSION="${{ steps.version.outputs.version }}"
+          mkdir -p dist
 
-      - name: Fetch release notes
+          SHARED="*.py static/ templates/ fonts/ requirements.txt README.md"
+
+          OUT="dist/pinsheet-printables_${VERSION}.zip"
+          zip -r "$OUT" $SHARED \
+            -x "*/__pycache__/*" \
+            -x "*.pyc"
+
+          echo "Created: $OUT"
+          ls -lh dist/
+
+      - name: Fetch release notes from merged PR
         id: notes
-        run: |
-          PR_NUM=$(gh pr list --base main --state merged --json number --jq '.[-1].number')
-          if [ -n "$PR_NUM" ]; then
-            gh pr view "$PR_NUM" --json body --jq '.body' > /tmp/release_notes.md
-            echo "NOTES_FILE=/tmp/release_notes.md" >> $GITHUB_OUTPUT
-          else
-            echo "No recent PR found" > /tmp/release_notes.md
-            echo "NOTES_FILE=/tmp/release_notes.md" >> $GITHUB_OUTPUT
-          fi
         env:
-          GH_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          PR_BODY=$(gh pr list --state merged --base main --limit 1 --json body --jq '.[0].body')
+          if [ -z "$PR_BODY" ]; then
+            echo "notes=Release $VERSION" >> $GITHUB_OUTPUT
+          else
+            echo "notes<<EOF" >> $GITHUB_OUTPUT
+            echo "$PR_BODY" >> $GITHUB_OUTPUT
+            echo "EOF" >> $GITHUB_OUTPUT
+          fi
 
-      - name: Create Release
+      - name: Create GitHub Release
         uses: softprops/action-gh-release@v1
         with:
-          name: "v${{ steps.version.outputs.VERSION }}"
-          body_path: ${{ steps.notes.outputs.NOTES_FILE }}
-          files: pinsheet-printables_${{ steps.version.outputs.VERSION }}.zip
+          name: v${{ steps.version.outputs.version }}
+          body: ${{ steps.notes.outputs.notes }}
           draft: false
           prerelease: false
+          files: |
+            dist/pinsheet-printables_${{ steps.version.outputs.version }}.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
