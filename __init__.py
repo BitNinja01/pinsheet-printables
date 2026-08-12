@@ -93,13 +93,11 @@ def register(app):
             if fn is not None:
                 csrf_exempt.exempt(fn)
 
+    from source.plugin_api import add_block
     pname = plugin_info["name"]
 
     # 1. Inject CSS
-    head_tag = f'<link rel="stylesheet" href="/plugins/{pname}/static/printables.css">'
-    app._plugin_blocks["head"] = (
-        (app._plugin_blocks.get("head", "") + "\n" + head_tag).strip()
-    )
+    add_block(app, pname, "head", f'<link rel="stylesheet" href="/plugins/{pname}/static/printables.css">')
 
     # 2. Add nav link
     if not hasattr(app, "_plugin_nav"):
